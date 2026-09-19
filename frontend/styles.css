@@ -22,8 +22,8 @@
 
 /* Soft visual system based on the original Figma concept. */
 :root{
-  --wine:#8b1830;
-  --wine-dark:#6f0d22;
+  --wine:#790018;
+  --wine-dark:#5d0013;
   --ink:#3a2022;
   --muted:#8d7975;
   --cream:#f8f0e6;
@@ -33,14 +33,14 @@
 }
 body{background:linear-gradient(145deg,#eeeae6,#e5e1dc)}
 .phone-shell{background:linear-gradient(180deg,#fffaf4 0%,#fffdf9 100%);border:1px solid #ffffffaa;border-radius:34px;box-shadow:0 24px 80px #4b28311c}
-.home-hero{margin-inline:-12px;padding-inline:22px;border-radius:30px;background:linear-gradient(145deg,#671024 0%,#86172d 58%,#a34655 100%);box-shadow:0 16px 34px #70142a26}
+.home-hero{margin-inline:-12px;padding-inline:22px;border-radius:30px;background:linear-gradient(145deg,#4b000e 0%,#650013 58%,#790018 100%);box-shadow:0 16px 34px #5d00132b}
 .quick-grid button,.wine-card,.region-card,.feature-banner,.wine-row,.filters-panel,.search-field,.filter-button,.camera-stage,.preview-stage,.integration-note,.sommelier-result,.compare-grid article,.comparison-table,.taste-hero,.taste-columns section,.profile-card,.stats,.menu-row,.auth-form input,.collection-card,.collection-art,.diary-card,.empty-box,.primary-button,.secondary-button,.choice{border-radius:18px}
 .quick-grid button{border-color:#eee0d7;background:#f6ebdd;box-shadow:0 8px 22px #4f2d2410}.quick-grid button:nth-child(2){background:#edf0e9}
 .quick-grid span,.menu-icon,.compare-hint>span{box-shadow:0 5px 14px #5d263015}
-.wine-card{overflow:hidden;box-shadow:0 8px 22px #4f2d2410}.wine-card .wine-image,.wine-card .wine-placeholder{background:#f7eee3}.region-card{box-shadow:0 10px 24px #3824221a}.feature-banner{background:linear-gradient(140deg,#6e1024,#901c35);box-shadow:0 12px 28px #70142a21}.feature-banner button{border-radius:14px}
+.wine-card{overflow:hidden;box-shadow:0 8px 22px #4f2d2410}.wine-card .wine-image,.wine-card .wine-placeholder{background:#f7eee3}.region-card{box-shadow:0 10px 24px #3824221a}.feature-banner{background:linear-gradient(140deg,#570010,#790018);box-shadow:0 12px 28px #5d001326}.feature-banner button{border-radius:14px}
 .search-field,.wine-row,.menu-row,.stats,.collection-card,.diary-card,.compare-grid article{box-shadow:0 7px 20px #4f2d2410}.filter-button{border-radius:15px;background:var(--wine-dark)}.filters-panel{background:#faf1e8;box-shadow:0 10px 24px #5a342616}.filters-panel select{border-radius:12px}.compare-check{margin:7px 7px 7px 0;border:0;border-radius:13px}.compare-check.active{background:var(--wine-dark)}
 .primary-button,.secondary-button{border-radius:15px;box-shadow:0 7px 18px #68122618}.choice{background:#fffdf9}.choice.selected{background:var(--wine-dark);border-color:var(--wine-dark)}
-.camera-stage,.preview-stage{box-shadow:0 12px 30px #33191c1c}.integration-note{border-left-width:0;background:#f6e9e5}.sommelier-result{margin-inline:-12px;border:1px solid #eadbd3;background:#f6eee5}.taste-hero{background:linear-gradient(145deg,#701126,#951f38);box-shadow:0 12px 28px #68122620}.profile-card{background:#f5e9df}.taste-columns section,.collection-art,.empty-box{background:#f7eee5}.auth-message{border-radius:14px}
+.camera-stage,.preview-stage{box-shadow:0 12px 30px #33191c1c}.integration-note{border-left-width:0;background:#f6e9e5}.sommelier-result{margin-inline:-12px;border:1px solid #eadbd3;background:#f6eee5}.taste-hero{background:linear-gradient(145deg,#570010,#790018);box-shadow:0 12px 28px #5d001326}.profile-card{background:#f5e9df}.taste-columns section,.collection-art,.empty-box{background:#f7eee5}.auth-message{border-radius:14px}
 .bottom-nav{width:min(calc(100% - 20px),410px);bottom:10px;min-height:68px;border:1px solid #eadfd8;border-radius:22px;background:#fffdf9ee;box-shadow:0 12px 32px #4a29251f}.nav-item{border-radius:14px;transition:color .2s ease,background-color .2s ease,transform .22s ease}.nav-item.active{background:#f8ece8}
 .site-footer{border-radius:28px 28px 0 0;background:#301d20}
 
@@ -57,4 +57,43 @@ button:active,.wine-card:active,.region-card:active,.collection-card:active{tran
   body{background:var(--paper)}
   .phone-shell{border:0;border-radius:0}
   .bottom-nav{width:calc(100% - 16px);bottom:8px}
+}
+
+/* Individual summary cards on every wine detail page. */
+.fact-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+  padding:4px 20px 14px;
+  border:0;
+}
+.fact-grid>div{
+  min-height:82px;
+  padding:14px 12px;
+  border:1px solid #eadbd3;
+  border-radius:17px;
+  background:linear-gradient(145deg,#fffdf9,#f7ece4);
+  box-shadow:0 7px 18px #4f2d2410;
+  transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s ease,border-color .22s ease;
+}
+.fact-grid>div+div{border-left:1px solid #eadbd3}
+.fact-grid small{
+  color:var(--wine);
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.fact-grid strong{
+  margin-top:8px;
+  color:var(--ink);
+  font-family:Prata,Georgia,serif;
+  font-size:10px;
+  font-weight:400;
+  overflow-wrap:anywhere;
+}
+@media(hover:hover) and (pointer:fine){
+  .fact-grid>div:hover{
+    transform:translateY(-3px) scale(1.025);
+    border-color:#d9b7b3;
+    box-shadow:0 12px 25px #5a2b301a;
+  }
 }
