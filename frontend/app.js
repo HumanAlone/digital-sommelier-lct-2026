@@ -156,7 +156,7 @@ function runSommelier() {
   const preferred = state.sommelier.category || ({ meat:'Красное', fish:'Белое', dessert:'Розовое', cheese:'Красное', evening:'' })[state.sommelier.dish];
   const pool = state.wines.filter((wine) => !preferred || wine.category === preferred);
   const offset = state.sommelier.mood === 'discover' ? Math.min(40,pool.length - 1) : state.sommelier.mood === 'light' ? Math.min(12,pool.length - 1) : 0;
-  state.sommelierResults = [...pool.slice(offset,offset + 3), ...pool.slice(0,3)].slice(0,3);
+  state.sommelierResults = [...pool.slice(offset), ...pool.slice(0,offset)].slice(0,3);
 }
 
 function compare() {
@@ -291,7 +291,7 @@ app.addEventListener('click', async (event) => {
   if (action === 'logout') { logoutUser(); state.user=null; go('profile'); }
   if (action === 'new-collection') { const name=prompt('Название подборки'); if(name?.trim()){state.collections.unshift({id:`c${Date.now()}`,name:name.trim(),wineIds:[]});persist('wine:v3:collections',state.collections);render();} }
   if (action === 'add-to-collection') { const name=prompt('Введите точное название вина'); const wine=state.wines.find((item)=>item.name.toLowerCase()===name?.trim().toLowerCase()); const collection=state.collections.find((item)=>item.id===id); if(wine&&collection&&!collection.wineIds.includes(wine.id)){collection.wineIds.push(wine.id);persist('wine:v3:collections',state.collections);render();} }
-  if (action === 'new-diary') { const name=prompt('Название вина'); const wine=state.wines.find((item)=>item.name.toLowerCase()===name?.trim().toLowerCase()); if(!wine)return; const rating=Number(prompt('Оценка от 1 до 5','5')); if(rating<1||rating>5)return; const note=prompt('Заметка','')||''; state.diary.unshift({wineId:wine.id,rating,note,date:new Date().toISOString()});persist('wine:v3:diary',state.diary);render(); }
+  if (action === 'new-diary') { const name=prompt('Название вина'); const wine=state.wines.find((item)=>item.name.toLowerCase()===name?.trim().toLowerCase()); if(!wine)return; const rating=Number(prompt('Оценка от 1 до 5','5')); if(!Number.isInteger(rating)||rating<1||rating>5)return; const note=prompt('Заметка','')||''; state.diary.unshift({wineId:wine.id,rating,note,date:new Date().toISOString()});persist('wine:v3:diary',state.diary);render(); }
 });
 
 app.addEventListener('change',(event) => {

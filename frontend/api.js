@@ -12,7 +12,8 @@ async function request(path, options) {
 
 function normalizeWine(wine) {
   if (!wine?.image_url || !base) return wine;
-  return { ...wine, image_url: new URL(wine.image_url, `${base}/`).href };
+  const apiRoot = new URL(`${base}/`, window.location.origin);
+  return { ...wine, image_url: new URL(wine.image_url, apiRoot).href };
 }
 
 export async function getWines() {

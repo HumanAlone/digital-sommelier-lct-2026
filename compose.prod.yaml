@@ -1,0 +1,49 @@
+name: digital-sommelier
+
+services:
+  backend:
+    image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/example/digital-sommelier}-backend:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    environment:
+      HF_HOME: /var/cache/huggingface
+      TRANSFORMERS_CACHE: /var/cache/huggingface
+    volumes:
+      - type: bind
+        source: ./backend/artifacts
+        target: /app/backend/artifacts
+        read_only: true
+      - type: volume
+        source: huggingface-cache
+        target: /var/cache/huggingface
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)); raise SystemExit(0 if data.get('ready') else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 180s
+    stop_grace_period: 20s
+
+  frontend:
+    image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/example/digital-sommelier}-frontend:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    environment:
+      WINE_API_BASE: /api
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  huggingface-cache:

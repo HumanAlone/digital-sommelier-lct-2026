@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+pytest-cache-files-*
+**/.ipynb_checkpoints
+backend/notebooks
+backend/artifacts
+backend/data/eval_with_slugs
+backend/data/ref_crops
+*.rar
+*.zip
+*.log
