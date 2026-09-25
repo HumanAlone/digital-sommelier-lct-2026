@@ -1,0 +1,15 @@
+faiss-cpu
+fastapi
+numpy
+pandas
+pillow
+rapidfuzz
+rapidocr
+onnxruntime
+torch
+torchvision
+transformers
+ultralytics
+uvicorn[standard]
+python-multipart
+pydantic
