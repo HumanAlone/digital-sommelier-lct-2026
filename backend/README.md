@@ -1,52 +1,74 @@
-# Своё Вино. Сканер — распознавание российских вин по фото этикетки
+# Своё Вино. Сканер – распознавание российских вин по фото этикетки
 
-Кейс «Лидеры цифровой трансформации 2026» (РСХБ.Цифра). Аналог Vivino для каталога
-«Своё Вино»: сервис принимает фотографию бутылки и возвращает карточку вина
+Кейс «Лидеры цифровой трансформации 2026» (РСХБ.Цифра). «Своё Вино»: сервис принимает фотографию бутылки и возвращает карточку вина
 в плоском JSON, совместимом с оценочным скриптом кейсодержателя.
 
-Пайплайн: YOLO-детекция бутылки → два SigLIP2-энкодера (base + finetuned) →
-FAISS-поиск (recall + rerank) → RapidOCR (кириллица) → фьюжн визуального и
-текстового скоров → топ-10 кандидатов. Подробности — в [ARCHITECTURE.md](ARCHITECTURE.md).
+Подробности и границы слоёв – в [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Метрики (публичный eval-датасет, 55 фото с ground truth)
+## Метрики (публичный eval-датасет)
 
 | Метрика | Значение |
 |---|---|
 | F1 @ top-1 | 0.9091 |
 | Accuracy @ top-10 | 0.9818 |
 
-Время ответа зависит от железа и замеряется `scripts/check_api.py`
-(целевой SLA по ТЗ — 3 c на запрос; точность приоритетнее скорости).
+## Структура репозитория
+
+```text
+backend/
+├── app/                  # Прод: HTTP + ML-пайплайн
+│   ├── config.py         # Автопоиск путей + все гиперпараметры (Cfg)
+│   ├── models.py         # SigLIP2 base+ft, FAISS-индексы, поиск
+│   ├── ocr.py            # RapidOCR: препроцессинг, порог уверенности
+│   ├── textmatch.py      # Токены каталога, IDF, транслит, скелетоны, OCR-скоринг
+│   ├── search.py         # WinePipeline: детекция → эмбеддинги → фьюжн → JSON
+│   └── main.py           # FastAPI: /predict, /wines, /wines/{id}, /images, /health
+├── artifacts/            # Вне git: веса и индексы
+│   ├── models/           # best.pt (YOLO), siglip_full_best.pt
+│   ├── index/            # gallery.faiss, gallery_finetuned.faiss
+│   ├── gallery_slugs.json
+│   ├── gallery_slugs_finetuned.json
+├── data/                 # catalog_cleaned.csv
+├── notebooks/            # Исследовательский контур: сборка индексов и дообучение
+├── .gitignore
+├── README.md
+├── Dockerfile
+└── ARCHITECTURE.md
+```
 
 ## Требования
 
 - Python 3.11
-- GPU **не требуется**: инференс рассчитан на CPU
+- GPU не требуется: инференс рассчитан на CPU
 - RAM: ≥ 4 ГБ (два энкодера SigLIP2 + YOLO + FAISS-индексы + OCR-модели)
+
+> **Критично:** пакет `python-multipart` обязателен.  
+> Входит в `requirements.txt`; при выборочной установке пакетов – ставить вручную.
 
 ## Сетап
 
 1. Склонируйте репозиторий.
-2. **Артефакты не лежат в git** (веса и индексы ~1 ГБ, см. `.gitignore`).
-   Получите архив у команды и распакуйте в корень репозитория:
+2. Артефакты и данные (веса и индексы ~1,5 ГБ).
 
    ```text
    artifacts/models/best.pt                  # YOLOv8, дообученная детекция этикеток
    artifacts/models/siglip_full_best.pt      # SigLIP2, дообученная на каталоге
-   artifacts/index/gallery.faiss             # индекс ступени recall (base)
-   artifacts/index/gallery_finetuned.faiss   # индекс ступени rerank (finetuned)
-   artifacts/gallery_slugs.json              # слаги в порядке индекса recall
-   artifacts/gallery_slugs_finetuned.json    # слаги в порядке индекса rerank
-   data/catalog_cleaned.csv                  # каталог (очищенный дамп Strapi)
-   data/eval_with_slugs/ , data/eval_slugs_new.csv   # публичный eval
+   artifacts/index/gallery.faiss             # Индекс ступени recall (base)
+   artifacts/index/gallery_finetuned.faiss   # Индекс ступени rerank (finetuned)
+   artifacts/gallery_slugs.json              # Слаги в порядке индекса recall
+   artifacts/gallery_slugs_finetuned.json    # Слаги в порядке индекса rerank
+   data/catalog_cleaned.csv                  # Каталог: читается сервером на старте
    ```
 
    Пути ищутся автоматически (`app/config.py`), жёсткой привязки к структуре нет.
+
+   > `data/catalog_cleaned.csv` – runtime-зависимость, а не исследовательские данные.
+
 3. Установите зависимости:
 
    ```bash
    python -m venv .venv
-   source .venv/bin/activate        # Windows: .venv\Scripts\activate
+   source .venv/bin/activate
    pip install -r requirements.txt
    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
    ```
@@ -64,10 +86,10 @@ FAISS-поиск (recall + rerank) → RapidOCR (кириллица) → фью�
 ## API
 
 ### POST /predict
-Multipart/form-data; имя поля с файлом любое (`image`, `file`, …) — берётся
-первый загруженный файл.
+Распознавание по фото. Multipart/form-data; имя поля с файлом любое
+(`image`, `file`, …) – берётся первый загруженный файл.
 
-Ответ — плоский JSON:
+Ответ – плоский JSON:
 
 ```json
 {
@@ -75,20 +97,25 @@ Multipart/form-data; имя поля с файлом любое (`image`, `file`
   "name": "Рубин кларет . Красная стрелка",
   "winery": "Denisov Winery",
   "region": "Самара",
-  "color": "Ярко-рубиновый цвет",
-  "photo": "https://api.vino-svoe.ru/v1/img/.../....webp",
+  "color": "Ярко-рубиновый  цвет",
+  "photo": "https://api.vino-svoe.ru/v1/img/str-api/1920/1920/resize/uploads/....webp",
   "confidence": 0.7849,
   "gap": 0.0047,
-  "top1_slug": "...", "top1_name": "...", "top1_score": 0.7849,
-  "top2_slug": "...", "top2_name": "...", "top2_score": 0.7801
+  "top1_slug": "denisov_rubin_klaret_krasnaya_strelka",
+  "top1_name": "Рубин кларет . Красная стрелка",
+  "top1_score": 0.7849,
+  "top2_slug": "denisov_pino_noir_klaret",
+  "top2_name": "Пино Нуар кларет. Красная стрелка",
+  "top2_score": 0.7801
 }
 ```
 
-- `slug` — лучший результат, поле, которое читает оценочный скрипт кейсодержателя;
-- `confidence`, `gap` — уверенность и отрыв от 2-го места (метрика уверенности
-  в API по ТЗ, в UI не требуется);
-- `top1…top10` — ближайшие кандидаты для экрана «не уверены» на фронте;
-- если бутылка не найдена — `{"slug": "", ...}` (HTTP 200, скрипт не падает).
+- `slug` – лучший результат; поле, которое читает оценочный скрипт кейсодержателя;
+- `confidence`, `gap` – уверенность и отрыв от 2-го места (метрика уверенности в API
+  по ТЗ; в UI не требуется). Фронтенд использует их для экрана «не уверены»;
+- `top1…top10` (`_slug`, `_name`, `_score`) – ближайшие кандидаты для UI;
+- если бутылка не найдена – `{"slug": "", …}` при HTTP 200: оценочный прогон не
+  прерывается, фронтенд трактует пустой `slug` как «не распознано».
 
 Пример:
 
@@ -96,46 +123,47 @@ Multipart/form-data; имя поля с файлом любое (`image`, `file`
 curl -s -X POST -F "image=@photo.jpg" http://127.0.0.1:8000/predict
 ```
 
+### GET /wines
+Каталог вин. Пагинация опциональна: `?skip=0&limit=50`; без параметров отдаётся весь каталог. Ответ:
+
+```json
+{
+  "total": 2103,
+  "items": [
+    {
+      "id": "denisov_rubin_klaret_krasnaya_strelka",
+      "name": "Рубин кларет . Красная стрелка",
+      "winery": "Denisov Winery",
+      "region": "Самара",
+      "category": "Розовое",
+      "color_description": "Ярко-рубиновый  цвет",
+      "grapes": ["Рубин Голодриги", "Цитронный Магарача"],
+      "description": "...",
+      "image_url": "https://api.vino-svoe.ru/v1/img/str-api/1920/1920/resize/uploads/....webp",
+      "abv": null,
+      "food_pairings": [],
+      "vintage": null,
+      "country": null
+    }
+  ]
+}
+```
+
+### GET /wines/{id}
+Карточка вина с теми же полями. Позиция не найдена – HTTP 404 с телом
+`{"detail": "Вино не найдено"}`.
+
 ### GET /health
 Готовность сервиса.
 
-## Оценка качества
+## Конфигурация
 
-```bash
-python scripts/check_api.py
-```
-
-Шлёт весь публичный eval-датасет в запущенный сервис, печатает top-1 и время
-(avg / p95). Ожидаемое совпадение с ноутбуком: 0.9091 / 0.9818.
-
-## Конфигурация и переменные окружения
-
-Переменные окружения **не требуются**: пути к артефактам находятся автоматически
-поверх папки запуска (`find_root`), все гиперпараметры собраны в dataclass `Cfg`
-в `app/config.py` (веса фьюжна, пороги OCR, top-k, веса выбора бокса).
-Опционально: `Cfg.torch_threads` — фиксация числа потоков torch под конкретное железо.
-
-## Ограничения
-
-- Инференс только CPU; fp16/autocast не используются (на CPU они замедляют).
-- Масштабирование воркерами не поддерживается (см. выше); рост пропускной
-  способности — через ONNX-экспорт, см. ARCHITECTURE.md.
-- Фото без бутылки → пустой `slug` (в приватной проверке таких не будет по словам кейсодержателей).
-- Каталог — снимок дампа; дообучение и переиндексация выполняются офлайн
-  (`notebooks/01–04`), скорость переиндексации по ТЗ не нормируется.
-- Винтажная лояльность («то же вино другого года») в выдаче не применяется:
-  `alias_map.json` не подменяет slug ответа (решение и обоснование — в ARCHITECTURE.md).
-- OCR добавляет ~0.2–0.4 c к ответу, но повышает достоверность на near-duplicates;
-  применение OCR по ТЗ оставлено на усмотрение команды.
+Пути к артефактам находятся автоматически, все гиперпараметры собраны
+в dataclass `Cfg` там же (веса фьюжна, пороги OCR, top-k, веса выбора бокса,
+photo-URL базы).
 
 ## Документация репозитория
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — пайплайн и границы слоёв.
-- `notebooks/README.md` — исследовательский контур: подготовка данных,
-  дообучение YOLO и SigLIP, сборка индексов, eval. Продакшен-код в `app/` —
-  выжимка финальной версии ноутбуков.
-
-## Права на материалы
-
-Каталог, фото и стилистика портала «Своё Вино» используются исключительно
-в демо-решении хакатона по разрешению кейсодержателя.
+- [ARCHITECTURE.md](ARCHITECTURE.md) – пайплайн и границы слоёв.
+- [notebooks/README.md](notebooks/README.md) – исследовательский контур: подготовка данных, дообучение
+  YOLO и SigLIP, сборка индексов, eval. Прод-код в `app/`, точка входа – [`app/main.py`](app/main.py).

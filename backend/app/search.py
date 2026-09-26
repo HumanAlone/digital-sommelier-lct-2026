@@ -55,7 +55,11 @@ class WinePipeline:
         self.idx_b, self.slugs_b, self.idx_f, self.slugs_f = load_indexes()
         self.yolo = YOLO(str(PATHS.yolo_pt))
         self.ocr = Ocr(cfg)
-        meta = pd.read_csv(PATHS.catalog_csv).drop_duplicates("Slug").set_index("Slug")
+        meta = (
+            pd.read_csv(PATHS.catalog_csv, encoding="utf-8")
+            .drop_duplicates("Slug")
+            .set_index("Slug")
+        )
         self.meta_rows = meta.to_dict("index")
         self.text = TextIndex(meta, cfg)
 
