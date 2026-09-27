@@ -107,7 +107,7 @@ function scanner() {
 }
 
 function preview() {
-  return `${header({ back: true, title: 'Проверьте фото' })}<p class="page-lead">Название и основные элементы этикетки должны быть хорошо видны.</p><div class="preview-stage">${state.previewUrl ? `<img src="${esc(state.previewUrl)}" alt="Фотография этикетки">` : '<div class="preview-label">WINE<br>LABEL</div>'}</div><div class="stacked-actions"><button class="primary-button" data-action="recognize">Найти вино</button><button class="secondary-button" data-page="scanner">Переснять</button></div>${!hasBackend ? '<div class="integration-note"><strong>Интерфейс готов к интеграции</strong><p>Распознавание заработает после подключения API команды. Сейчас можно изучить каталог вручную.</p><button class="text-button" data-page="catalog">Перейти в каталог</button></div>' : ''}`;
+  return `${header({ back: true, title: 'Проверьте фото' })}<p class="page-lead">Проверьте, что этикетка чёткая и без бликов. Используйте этот снимок для поиска или переснимите его.</p><div class="preview-stage">${state.previewUrl ? `<img src="${esc(state.previewUrl)}" alt="Фотография этикетки">` : '<div class="preview-label">WINE<br>LABEL</div>'}</div><div class="stacked-actions"><button class="primary-button" data-action="recognize">Использовать фото и найти вино</button><button class="secondary-button" data-action="retake-photo">Переснять</button></div>${!hasBackend ? '<div class="integration-note"><strong>Интерфейс готов к интеграции</strong><p>Распознавание заработает после подключения API команды. Сейчас можно изучить каталог вручную.</p><button class="text-button" data-page="catalog">Перейти в каталог</button></div>' : ''}`;
 }
 
 function recognizing() {
@@ -129,7 +129,7 @@ function result() {
   const wine = wineById(state.selectedId);
   if (!wine) return notFound();
   const similar = similarWines(wine);
-  return `${header({ back: true })}<article class="wine-detail-card"><div class="detail-visual">${image(wine,'result-image')}<button class="detail-heart ${isFavorite(wine.id) ? 'active' : ''}" data-action="toggle-favorite" data-id="${esc(wine.id)}">${icon('heart',20)}</button></div><div class="detail-head"><span class="eyebrow">${esc(wine.category || 'РОССИЙСКОЕ ВИНО')}</span><h1>${esc(wine.name)}</h1><p>${esc(wine.winery || '')}</p></div><div class="fact-grid"><div><small>Регион</small><strong>${esc(wine.region || 'Не указан')}</strong></div><div><small>Сорт</small><strong>${esc((wine.grapes || []).join(', ') || 'Не указан')}</strong></div><div><small>Цвет</small><strong>${esc(wine.color_description || wine.category || 'Не указан')}</strong></div></div><section class="detail-section"><h2>О вине</h2><p>${esc(wine.description || 'Описание пока недоступно.')}</p></section><div class="detail-actions"><button class="primary-button" data-page="sommelier">${icon('sparkles',17)} Подобрать гастропару</button><button class="secondary-button" data-action="toggle-compare" data-id="${esc(wine.id)}">${state.compare.includes(wine.id) ? 'Убрать из сравнения' : 'Добавить к сравнению'}</button></div></article>${similar.length ? `<section class="section-block">${sectionHead('Похожие вина')}<div class="wine-carousel">${similar.map((item) => wineCard(item,true)).join('')}</div></section>` : ''}`;
+  return `${header({ back: true })}${state.foundByPrediction ? '<div class="stacked-actions"><button class="secondary-button" data-action="retake-photo">Переснять этикетку</button></div>' : ''}<article class="wine-detail-card"><div class="detail-visual">${image(wine,'result-image')}<button class="detail-heart ${isFavorite(wine.id) ? 'active' : ''}" data-action="toggle-favorite" data-id="${esc(wine.id)}">${icon('heart',20)}</button></div><div class="detail-head"><span class="eyebrow">${esc(wine.category || 'РОССИЙСКОЕ ВИНО')}</span><h1>${esc(wine.name)}</h1><p>${esc(wine.winery || '')}</p></div><div class="fact-grid"><div><small>Регион</small><strong>${esc(wine.region || 'Не указан')}</strong></div><div><small>Сорт</small><strong>${esc((wine.grapes || []).join(', ') || 'Не указан')}</strong></div><div><small>Цвет</small><strong>${esc(wine.color_description || wine.category || 'Не указан')}</strong></div></div><section class="detail-section"><h2>О вине</h2><p>${esc(wine.description || 'Описание пока недоступно.')}</p></section><div class="detail-actions"><button class="primary-button" data-page="sommelier">${icon('sparkles',17)} Подобрать гастропару</button><button class="secondary-button" data-action="toggle-compare" data-id="${esc(wine.id)}">${state.compare.includes(wine.id) ? 'Убрать из сравнения' : 'Добавить к сравнению'}</button></div></article>${similar.length ? `<section class="section-block">${sectionHead('Похожие вина')}<div class="wine-carousel">${similar.map((item) => wineCard(item,true)).join('')}</div></section>` : ''}`;
 }
 
 function notFound() {
@@ -277,6 +277,11 @@ app.addEventListener('click', async (event) => {
   if (action === 'choose-photo') document.querySelector('#photo-input')?.click();
   if (action === 'take-photo') capturePhoto();
   if (action === 'retry-camera') startCamera();
+  if (action === 'retake-photo') {
+    if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
+    state.previewUrl = null; state.photo = null; state.foundByPrediction = false;
+    go('scanner');
+  }
   if (action === 'recognize') {
     if (!state.photo) return;
     if (!hasBackend) { go('notfound'); return; }
