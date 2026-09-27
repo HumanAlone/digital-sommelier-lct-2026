@@ -8,6 +8,7 @@ services:
     environment:
       HF_HOME: /var/cache/huggingface
       TRANSFORMERS_CACHE: /var/cache/huggingface
+    init: true
     volumes:
       - type: bind
         source: ./backend/artifacts
@@ -35,7 +36,8 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     environment:
-      WINE_API_BASE: /
+      WINE_API_BASE: ${WINE_API_BASE:-/}
+    init: true
     depends_on:
       backend:
         condition: service_healthy

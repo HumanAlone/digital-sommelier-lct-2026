@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, dev]
   pull_request:
 
 permissions:
@@ -48,8 +48,16 @@ jobs:
       - name: Test frontend behavior and API client
         run: node --test tests/frontend/*.test.mjs
 
-      - name: Validate Docker Compose
-        run: docker compose config --quiet
+      - name: Validate Docker Compose files
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.prod.yaml config --quiet
 
       - name: Build frontend image
         run: docker build --file frontend/Dockerfile --tag digital-sommelier-frontend:ci .
+
+      - name: Start and check frontend image
+        run: |
+          docker run --detach --rm --name digital-sommelier-frontend-ci --publish 8080:80 digital-sommelier-frontend:ci
+          curl --fail --retry 5 --retry-connrefused http://127.0.0.1:8080/health
+          docker stop digital-sommelier-frontend-ci

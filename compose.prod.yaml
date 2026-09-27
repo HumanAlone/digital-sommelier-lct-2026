@@ -2,11 +2,12 @@ name: digital-sommelier
 
 services:
   backend:
-    image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/example/digital-sommelier}-backend:${IMAGE_TAG:-latest}"
+    image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/humanalone/digital-sommelier}-backend:${IMAGE_TAG:-latest}"
     restart: unless-stopped
     environment:
       HF_HOME: /var/cache/huggingface
       TRANSFORMERS_CACHE: /var/cache/huggingface
+    init: true
     volumes:
       - type: bind
         source: ./backend/artifacts
@@ -30,10 +31,11 @@ services:
     stop_grace_period: 20s
 
   frontend:
-    image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/example/digital-sommelier}-frontend:${IMAGE_TAG:-latest}"
+    image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/humanalone/digital-sommelier}-frontend:${IMAGE_TAG:-latest}"
     restart: unless-stopped
     environment:
-      WINE_API_BASE: /
+      WINE_API_BASE: ${WINE_API_BASE:-/}
+    init: true
     depends_on:
       backend:
         condition: service_healthy
