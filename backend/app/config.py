@@ -31,15 +31,12 @@ class Paths:
     siglip_ft_pt: Path = _pick("siglip_full_best.pt", "artifacts/models", "artifacts")
     recall_idx: Path = _pick("gallery.faiss", "artifacts/index", "artifacts")
     rerank_idx: Path = _pick("gallery_finetuned.faiss", "artifacts/index", "artifacts")
-
     recall_slugs: Path = _pick("gallery_slugs.json", "artifacts/index", "artifacts")
     rerank_slugs: Path = _pick(
         "gallery_slugs_finetuned.json", "artifacts/index", "artifacts"
     )
     catalog_csv: Path = _pick("catalog_cleaned.csv", "data", "")
-    gt_csv: Path = _pick("eval_slugs_new.csv", "data", "")
-    eval_dir: Path = _pick("eval_with_slugs", "data", "")
-    crops_dir: Path = _pick("ref_crops", "data", "")
+    # crops_dir: Path = _pick("ref_crops", "data", "")  # Тут кропы были
 
 
 @dataclass(frozen=True)

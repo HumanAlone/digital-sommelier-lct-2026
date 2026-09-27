@@ -55,7 +55,7 @@ def _row_to_card(slug: str, row: dict, cfg) -> dict:
         "grapes": grapes,
         "description": str(row.get("Описание", "")),
         "image_url": "" if pd.isna(photo) else cfg.photo_base + quote(str(photo)),
-        # этих полей в CSV-дампе нет вовсе: по контракту фронта null/[], не выдумываем
+        # Этих полей в CSV-дампе нет, по контракту - null/[],
         "abv": None,
         "food_pairings": [],
         "vintage": int(m.group(0)) if m else None,
