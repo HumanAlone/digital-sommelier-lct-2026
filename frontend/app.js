@@ -1,4 +1,4 @@
-import { getWines, getWine, scanWine, hasBackend, registerUser, loginUser, restoreUser, logoutUser } from './api.js';
+import { getWines, getWine, predictWine, hasBackend } from './api.js';
 
 const app = document.querySelector('#app');
 const saved = (key, fallback) => {
@@ -8,7 +8,7 @@ const persist = (key, value) => localStorage.setItem(key, JSON.stringify(value))
 
 const state = {
   page: 'home', previousPage: 'home', wines: [], selectedId: null, loading: true, loadError: false,
-  photo: null, previewUrl: null, cameraStatus: 'idle', foundByScan: false,
+  photo: null, previewUrl: null, cameraStatus: 'idle', foundByPrediction: false, predictionCandidates: [],
   query: '', catalogLimit: 24, filtersOpen: false,
   filters: { category: '', region: '', winery: '', grape: '' },
   favorites: saved('wine:v3:favorites', saved('wine:v2:favorites', [])),
@@ -16,7 +16,7 @@ const state = {
   collections: saved('wine:v3:collections', saved('wine:v2:collections', [])),
   diary: saved('wine:v3:diary', saved('wine:v2:diary', [])),
   compare: saved('wine:v3:compare', []), selectedCollection: null,
-  sommelier: { dish: '', category: '', mood: '' }, sommelierResults: [], user: null,
+  sommelier: { dish: '', category: '', mood: '' }, sommelierResults: [],
 };
 
 const icons = {
@@ -52,7 +52,7 @@ function header({ back = false, title = '' } = {}) {
 
 function nav() {
   const items = [['home','Главная','home'],['catalog','Каталог','catalog'],['scanner','Сканер','scan'],['favorites','Избранное','heart'],['profile','Профиль','user']];
-  const profilePages = ['profile','register','login','history','collections','collectionDetail','diary','taste','settings'];
+  const profilePages = ['profile','history','collections','collectionDetail','diary','taste','settings'];
   return `<nav class="bottom-nav" aria-label="Основная навигация">${items.map(([page,label,glyph]) => {
     const active = state.page === page || (page === 'profile' && profilePages.includes(state.page));
     return `<button data-page="${page}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(glyph, 20)}<span>${label}</span></button>`;
@@ -112,6 +112,18 @@ function preview() {
 
 function recognizing() {
   return `${header()}<div class="recognition"><div class="recognition-mark">${icon('scan',38)}</div><span class="eyebrow">АНАЛИЗ ИЗОБРАЖЕНИЯ</span><h1>Ищем ваше вино</h1><p>Сверяем этикетку с каталогом российских вин</p><div class="progress-line"><i></i></div><ol><li class="done">Фото подготовлено</li><li class="active">Поиск совпадения</li><li>Открытие карточки</li></ol></div>`;
+}
+
+function isUncertainPrediction(response, candidateIds) {
+  const confidence = Number(response.confidence);
+  const gap = Number(response.gap);
+  return candidateIds.length > 1
+    && ((Number.isFinite(confidence) && confidence < 0.65) || (Number.isFinite(gap) && gap < 0.08));
+}
+
+function predictionOptions() {
+  const candidates = state.predictionCandidates;
+  return `${header({ back: true, title: 'Уточните вино' })}<div class="prediction-options"><span class="eyebrow">НУЖНА ВАША ПОМОЩЬ</span><h2>Нашли несколько похожих этикеток</h2><p>Выберите бутылку, которая больше всего похожа на вашу.</p><div class="catalog-list">${candidates.map(wineRow).join('')}</div><button class="text-button" data-page="scanner">Сделать другое фото</button></div>`;
 }
 
 function similarWines(wine) {
@@ -180,15 +192,10 @@ function recommendations() {
 }
 
 function profile() {
-  return `${header({ title:'Личный кабинет' })}${state.user ? '' : '<div class="auth-actions"><button class="primary-button" data-page="register">Регистрация</button><button class="secondary-button" data-page="login">Вход</button></div>'}<div class="profile-card"><div class="profile-avatar">${icon('user',27)}</div><div><span class="eyebrow">${state.user ? 'УЧАСТНИК КЛУБА' : 'ГОСТЕВОЙ РЕЖИМ'}</span><h2>${esc(state.user?.name || state.user?.email || 'Гость')}</h2><p>${state.user?.email ? esc(state.user.email) : 'Ваше пространство для вина'}</p></div></div><div class="stats"><span><strong>${state.history.filter(wineById).length}</strong>просмотров</span><span><strong>${state.favorites.filter(wineById).length}</strong>избранных</span><span><strong>${state.diary.length}</strong>оценок</span></div><div class="menu-list">${[['taste','Паспорт вкуса','Персональный профиль'],['recommendations','Рекомендации','Подборка для вас'],['history','История','Недавно просмотренные'],['collections','Мои подборки','Собственные списки'],['diary','Винный дневник','Оценки и заметки'],['settings','Настройки','Профиль и приложение']].map(([page,title,subtitle]) => `<button class="menu-row" data-page="${page}"><span class="menu-icon">${icon(page === 'taste' ? 'sparkles' : page === 'history' ? 'catalog' : page === 'collections' ? 'heart' : 'user',18)}</span><span><strong>${title}</strong><small>${subtitle}</small></span>${icon('chevron',16)}</button>`).join('')}</div>${state.user ? '<button class="text-button signout-button" data-action="logout">Выйти из аккаунта</button>' : ''}`;
+  return `${header({ title:'Личный кабинет' })}<div class="profile-card"><div class="profile-avatar">${icon('user',27)}</div><div><span class="eyebrow">МОЁ ВИННОЕ ПРОСТРАНСТВО</span><h2>Мой профиль</h2><p>Ваше пространство для вина</p></div></div><div class="stats"><span><strong>${state.history.filter(wineById).length}</strong>просмотров</span><span><strong>${state.favorites.filter(wineById).length}</strong>избранных</span><span><strong>${state.diary.length}</strong>оценок</span></div><div class="menu-list">${[['taste','Паспорт вкуса','Персональный профиль'],['recommendations','Рекомендации','Подборка для вас'],['history','История','Недавно просмотренные'],['collections','Мои подборки','Собственные списки'],['diary','Винный дневник','Оценки и заметки'],['settings','Настройки','Профиль и приложение']].map(([page,title,subtitle]) => `<button class="menu-row" data-page="${page}"><span class="menu-icon">${icon(page === 'taste' ? 'sparkles' : page === 'history' ? 'catalog' : page === 'collections' ? 'heart' : 'user',18)}</span><span><strong>${title}</strong><small>${subtitle}</small></span>${icon('chevron',16)}</button>`).join('')}</div>`;
 }
 
-function authPage(type) {
-  const register = type === 'register';
-  return `${header({ back:true,title:register ? 'Регистрация' : 'Вход' })}<p class="page-lead">${register ? 'Создайте аккаунт, чтобы сохранять винное пространство.' : 'Вернитесь к своим винам и рекомендациям.'}</p><form id="${type}-form" class="auth-form">${register ? '<label>Имя<input name="name" autocomplete="name" required placeholder="Как к вам обращаться"></label>' : ''}<label>Электронная почта<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label><label>Пароль<input name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="Не менее 8 символов"></label>${register ? '<label>Повторите пароль<input name="confirm" type="password" minlength="8" required placeholder="Повторите пароль"></label>' : ''}<p id="auth-message" class="auth-message" role="alert" hidden></p><button class="primary-button full" type="submit">${register ? 'Зарегистрироваться' : 'Войти'}</button></form><p class="auth-switch">${register ? 'Уже есть аккаунт?' : 'Ещё нет аккаунта?'} <button class="text-button" data-page="${register ? 'login' : 'register'}">${register ? 'Войти' : 'Зарегистрироваться'}</button></p>`;
-}
-const register = () => authPage('register');
-const login = () => authPage('login');
+
 const favorites = () => `${header({title:'Избранное'})}<p class="page-lead">Вина, к которым хочется вернуться.</p><div class="catalog-list">${state.favorites.map(wineById).filter(Boolean).map(wineRow).join('') || empty('Сохраняйте вина из каталога и карточек.')}</div>`;
 const history = () => `${header({back:true,title:'История'})}<div class="catalog-list">${state.history.map(wineById).filter(Boolean).map(wineRow).join('') || empty('Просмотренные вина появятся здесь.')}</div>`;
 
@@ -205,7 +212,7 @@ function diary() {
 }
 const settings = () => `${header({back:true,title:'Настройки'})}<div class="menu-list settings-list">${[['Данные профиля','Списки хранятся в этом браузере'],['Приватность','Фото не сохраняются интерфейсом'],['Тема приложения','Фирменная светлая'],['О проекте','Хакатон РСХБ.Цифра 2026']].map(([title,subtitle]) => `<div class="menu-row static"><span><strong>${title}</strong><small>${subtitle}</small></span></div>`).join('')}</div>`;
 
-const pages = { home,catalog,scanner,preview,recognizing,result,notfound:notFound,sommelier,compare,taste,recommendations,profile,register,login,favorites,history,collections,collectionDetail,diary,settings };
+const pages = { home,catalog,scanner,preview,recognizing,predictionOptions,result,notfound:notFound,sommelier,compare,taste,recommendations,profile,favorites,history,collections,collectionDetail,diary,settings };
 let cameraStream = null;
 let cameraRequestId = 0;
 
@@ -245,14 +252,14 @@ function setPhoto(file) {
   state.photo = file; state.previewUrl = URL.createObjectURL(file); go('preview');
 }
 function render() {
-  app.innerHTML = `<div class="desktop-backdrop"><main class="phone-shell page-${state.page}">${state.loading ? '<div class="loading"><span></span><p>Открываем каталог…</p></div>' : pages[state.page]?.() || home()}${['scanner','preview','recognizing'].includes(state.page) ? '' : nav()}</main></div>`;
+  app.innerHTML = `<div class="desktop-backdrop"><main class="phone-shell page-${state.page}">${state.loading ? '<div class="loading"><span></span><p>Открываем каталог…</p></div>' : pages[state.page]?.() || home()}${['scanner','preview','recognizing','predictionOptions'].includes(state.page) ? '' : nav()}</main></div>`;
 }
 function go(page) {
   if (state.page === 'scanner') stopCamera();
   state.previousPage = state.page; state.page = page; window.scrollTo(0,0); render(); if (page === 'scanner') startCamera();
 }
-function openWine(id,scanned=false) {
-  state.selectedId = id; state.foundByScan = scanned;
+function openWine(id,predicted=false) {
+  state.selectedId = id; state.foundByPrediction = predicted;
   state.history = [id,...state.history.filter((item)=>item!==id)].slice(0,40); persist('wine:v3:history',state.history); go('result');
 }
 function toggleFavorite(id) {
@@ -273,7 +280,7 @@ app.addEventListener('click', async (event) => {
   if (target.dataset.filterRegion) { state.filters.region = target.dataset.filterRegion; state.filtersOpen = true; go('catalog'); return; }
   if (target.dataset.sommelier) { state.sommelier[target.dataset.sommelier] = target.dataset.value; state.sommelierResults = []; render(); return; }
   const {action,id} = target.dataset;
-  if (action === 'back') { go(({preview:'scanner',scanner:'home',result:'catalog',collectionDetail:'collections',register:'profile',login:'profile'})[state.page] || state.previousPage || 'home'); }
+  if (action === 'back') { go(({preview:'scanner',scanner:'home',predictionOptions:'preview',result:'catalog',collectionDetail:'collections'})[state.page] || state.previousPage || 'home'); }
   if (action === 'toggle-filters') { state.filtersOpen = !state.filtersOpen; render(); }
   if (action === 'reset-filters') { state.filters = {category:'',region:'',winery:'',grape:''}; state.query=''; state.catalogLimit=24; render(); }
   if (action === 'show-more') { state.catalogLimit += 24; render(); }
@@ -286,9 +293,18 @@ app.addEventListener('click', async (event) => {
     if (!state.photo) return;
     if (!hasBackend) { go('notfound'); return; }
     go('recognizing');
-    try { const response = await scanWine(state.photo); const id = response.wine_id || response.slug; let wine = wineById(id); if (!wine && id) wine = await getWine(id); if (wine && !wineById(id)) state.wines.push(wine); wine ? openWine(wine.id,true) : go('notfound'); } catch { go('notfound'); }
+    try {
+      const response = await predictWine(state.photo);
+      const ids = [...new Set([response.wine_id, response.slug, ...Array.from({ length: 10 }, (_, index) => response[`top${index + 1}_slug`])].filter(Boolean))];
+      const wines = await Promise.all(ids.map(async (id) => wineById(id) || await getWine(id)));
+      const candidates = wines.filter(Boolean);
+      candidates.forEach((wine) => { if (!wineById(wine.id)) state.wines.push(wine); });
+      if (!candidates.length) go('notfound');
+      else if (isUncertainPrediction(response, ids)) { state.predictionCandidates = candidates.slice(0, 4); go('predictionOptions'); }
+      else openWine(candidates[0].id, true);
+    } catch { go('notfound'); }
   }
-  if (action === 'logout') { logoutUser(); state.user=null; go('profile'); }
+
   if (action === 'new-collection') { const name=prompt('Название подборки'); if(name?.trim()){state.collections.unshift({id:`c${Date.now()}`,name:name.trim(),wineIds:[]});persist('wine:v3:collections',state.collections);render();} }
   if (action === 'add-to-collection') { const name=prompt('Введите точное название вина'); const wine=state.wines.find((item)=>item.name.toLowerCase()===name?.trim().toLowerCase()); const collection=state.collections.find((item)=>item.id===id); if(wine&&collection&&!collection.wineIds.includes(wine.id)){collection.wineIds.push(wine.id);persist('wine:v3:collections',state.collections);render();} }
   if (action === 'new-diary') { const name=prompt('Название вина'); const wine=state.wines.find((item)=>item.name.toLowerCase()===name?.trim().toLowerCase()); if(!wine)return; const rating=Number(prompt('Оценка от 1 до 5','5')); if(!Number.isInteger(rating)||rating<1||rating>5)return; const note=prompt('Заметка','')||''; state.diary.unshift({wineId:wine.id,rating,note,date:new Date().toISOString()});persist('wine:v3:diary',state.diary);render(); }
@@ -306,13 +322,7 @@ app.addEventListener('input',(event) => {
 app.addEventListener('submit',async(event) => {
   event.preventDefault(); const form=event.target;
   if (form.id === 'sommelier-form') { runSommelier(); render(); document.querySelector('.sommelier-result')?.scrollIntoView({behavior:'smooth'}); return; }
-  if (!['register-form','login-form'].includes(form.id)) return;
-  const fields=Object.fromEntries(new FormData(form)); const message=form.querySelector('#auth-message');
-  const fail=(text)=>{message.textContent=text;message.hidden=false;};
-  if(form.id==='register-form'&&fields.password!==fields.confirm){fail('Пароли не совпадают.');return;}
-  if(!hasBackend){fail('Регистрация и вход заработают после подключения сервера.');return;}
-  const button=form.querySelector('[type="submit"]');button.disabled=true;
-  try{state.user=form.id==='register-form'?await registerUser({name:fields.name.trim(),email:fields.email.trim(),password:fields.password}):await loginUser({email:fields.email.trim(),password:fields.password});go('profile');}catch(error){fail(error.message||'Не удалось связаться с сервером.');button.disabled=false;}
+
 });
 
 async function loadWines() {
@@ -321,5 +331,4 @@ async function loadWines() {
   state.loading=false;render();
 }
 loadWines();
-restoreUser().then((user)=>{state.user=user;if(state.page==='profile')render();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.page==='scanner')stopCamera();else if(!document.hidden&&state.page==='scanner'&&!cameraStream)startCamera();});

@@ -26,11 +26,10 @@ def test_frontend_and_nginx_api_routes_match():
     nginx = (ROOT / "docker" / "nginx.conf").read_text(encoding="utf-8")
 
     assert "request('/wines')" in api
-    assert "request('/scan'" in api
-    assert "location = /api/wines" in nginx
-    assert "location = /api/scan" in nginx
-    assert "proxy_pass http://wine_backend/predict;" in nginx
-    assert "location /api/assets/" in nginx
+    assert "request('/predict'" in api
+    assert "location ^~ /wines" in nginx
+    assert "location = /predict" in nginx
+    assert "proxy_pass http://wine_backend;" in nginx
 
 
 def test_container_shell_scripts_use_unix_line_endings():

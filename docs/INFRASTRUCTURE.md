@@ -5,8 +5,8 @@
 ```mermaid
 flowchart LR
     U[Браузер] -->|:8080| N[Nginx + frontend]
-    N -->|/api/wines| C[Локальный catalog.json]
-    N -->|/api/scan → /predict| B[FastAPI]
+    N -->|/wines, /wines/slug| B[FastAPI]
+    N -->|/predict| B[FastAPI]
     B --> Y[YOLO]
     B --> S[SigLIP]
     B --> F[FAISS + OCR]
@@ -50,7 +50,7 @@ docker compose up --build
 - сайт: `http://localhost:8080`;
 - frontend healthcheck: `http://localhost:8080/health`;
 - backend healthcheck: `http://localhost:8000/health`;
-- backend через frontend proxy: `http://localhost:8080/api/health`.
+- backend через frontend proxy: `http://localhost:8080/backend-health`.
 
 Первый запуск backend может занять несколько минут: базовая SigLIP-модель загружается в volume `hf-cache`. Для этого контейнеру нужен доступ к Hugging Face. Backend запускается одним worker, потому что каждый worker отдельно загружает ML-модели в память.
 
@@ -72,11 +72,15 @@ BACKEND_PORT=8000
 
 ## Совместимость API
 
-Текущий backend предоставляет только `GET /health` и `POST /predict`. Текущий frontend ожидает `/api/wines` и `/api/scan`, поэтому Nginx выполняет временную адаптацию:
+Frontend и backend используют одинаковые пути:
 
-- `/api/wines` возвращает существующий `frontend/catalog.json`;
-- `/api/scan` передаёт запрос в backend `/predict`;
-- неизвестные `/api/*` возвращают JSON с кодом 404.
+- `GET /wines` — каталог;
+- `GET /wines/{id}` — карточка вина;
+- `POST /predict` — распознавание фотографии;
+- `GET /health` — проверка готовности backend при прямом доступе;
+- `GET /backend-health` — проверка backend через Nginx.
+
+В Docker Nginx передаёт `/wines` и `/predict` в FastAPI, не меняя путь.
 
 Авторизация, личные подборки, избранное, история и дневник пока работают только как интерфейс и локальные данные браузера. Для серверного хранения backend должен позже реализовать соответствующие endpoints.
 

@@ -35,7 +35,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     environment:
-      WINE_API_BASE: /api
+      WINE_API_BASE: /
     depends_on:
       backend:
         condition: service_healthy
@@ -49,4 +49,3 @@ services:
 
 volumes:
   huggingface-cache:
-

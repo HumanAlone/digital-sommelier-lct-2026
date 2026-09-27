@@ -60,11 +60,12 @@ for(const rating of ['0','6','abc','2.5',null]) test(`diary rejects invalid rati
   const answers=['Каберне',rating,'note']; const h=await appHarness({prompt:()=>answers.shift()});
   await h.click({action:'new-diary'}); assert.equal(h.state.diary.length,0);
 });
-test('guest profile shows login and registration; authenticated profile shows logout',async()=>{
-  const h=await appHarness(); h.run("go('profile')"); assert.match(h.app.innerHTML,/Регистрация/);
-  h.state.user={id:'u',name:'Соня'}; h.run('render()'); assert.match(h.app.innerHTML,/Выйти из аккаунта/);
-  assert.doesNotMatch(h.app.innerHTML,/class="auth-actions"/);
+test('profile is available without authentication controls',async()=>{
+  const h=await appHarness(); h.run("go('profile')");
+  assert.match(h.app.innerHTML,/Мой профиль/);
+  assert.doesNotMatch(h.app.innerHTML,/Регистрация|Вход|Выйти из аккаунта|auth-actions/);
 });
+
 test('denied camera leaves file upload available and capture disabled',async()=>{
   const h=await appHarness({navigator:{mediaDevices:{getUserMedia:async()=>{throw Error('denied');}}}});
   h.elements['#capture-button']={}; h.elements['#camera-message']={}; h.elements['#camera-retry']={};
@@ -77,12 +78,20 @@ test('camera acquired after navigation is stopped',async()=>{
   h.state.page='scanner'; const pending=h.run('startCamera()'); h.run("go('home')");
   resolve({getTracks:()=>[{stop:()=>stopped++}]}); await pending; assert.equal(stopped,1);
 });
-for(const response of [{slug:'red'},{wine_id:'white'}]) test(`scan opens matching card: ${JSON.stringify(response)}`,async()=>{
-  const h=await appHarness({hasBackend:true,scanWine:async()=>response}); h.state.photo=new Blob(['image']);
+for(const response of [{slug:'red',confidence:.92,gap:.2},{wine_id:'white',confidence:.78,gap:.12}]) test(`prediction opens matching card when confident: ${JSON.stringify(response)}`,async()=>{
+  const h=await appHarness({hasBackend:true,predictWine:async()=>response}); h.state.photo=new Blob(['image']);
   await h.click({action:'recognize'}); assert.equal(h.state.page,'result'); assert.equal(h.state.selectedId,response.slug||response.wine_id);
 });
-for(const scanWine of [async()=>({slug:''}),async()=>{throw Error('offline');}]) test('failed scan displays recovery screen',async()=>{
-  const h=await appHarness({hasBackend:true,scanWine}); h.state.photo=new Blob(['image']);
+test('uncertain prediction shows only candidates returned by ML',async()=>{
+  const response={slug:'red',confidence:.54,gap:.03,top1_slug:'red',top2_slug:'red2',top3_slug:'white'};
+  const h=await appHarness({hasBackend:true,predictWine:async()=>response}); h.state.photo=new Blob(['image']);
+  await h.click({action:'recognize'});
+  assert.equal(h.state.page,'predictionOptions');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.state.predictionCandidates.map(wine=>wine.id))),['red','red2','white']);
+  assert.match(h.app.innerHTML,/Нашли несколько похожих этикеток/);
+});
+for(const predictWine of [async()=>({slug:''}),async()=>{throw Error('offline');}]) test('failed scan displays recovery screen',async()=>{
+  const h=await appHarness({hasBackend:true,predictWine}); h.state.photo=new Blob(['image']);
   await h.click({action:'recognize'}); assert.equal(h.state.page,'notfound'); assert.match(h.app.innerHTML,/Попробовать другое фото/);
 });
 test('similar wines exclude selected wine and sommelier respects selected color',async()=>{

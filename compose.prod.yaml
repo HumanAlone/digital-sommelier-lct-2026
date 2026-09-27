@@ -33,7 +33,7 @@ services:
     image: "${REGISTRY_IMAGE_PREFIX:-ghcr.io/example/digital-sommelier}-frontend:${IMAGE_TAG:-latest}"
     restart: unless-stopped
     environment:
-      WINE_API_BASE: /api
+      WINE_API_BASE: /
     depends_on:
       backend:
         condition: service_healthy

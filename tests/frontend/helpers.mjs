@@ -19,9 +19,8 @@ export async function appHarness(overrides = {}) {
     window: { scrollTo() {} }, navigator: {},
     document: { querySelector: s => s === '#app' ? app : elements[s] ?? null, addEventListener() {} },
     localStorage: storage(), prompt: () => null,
-    hasBackend: false, getWines: async () => structuredClone(wines), restoreUser: async () => null,
-    getWine: async () => null, scanWine: async () => ({ slug: '' }), logoutUser() {},
-    registerUser: async () => null, loginUser: async () => null,
+    hasBackend: false, getWines: async () => structuredClone(wines),
+    getWine: async () => null, predictWine: async () => ({ slug: '' }),
     ...overrides,
   });
   // Execute the actual application; only its API imports and browser services are substituted.
@@ -33,10 +32,10 @@ export async function appHarness(overrides = {}) {
     click: dataset => events.click({ target: { closest: () => ({ dataset }) } }),
   };
 }
-export function apiHarness(base = '/api', responses = [], initial = {}) {
+export function apiHarness(base = '/', responses = [], initial = {}) {
   const calls = [];
   const context = vm.createContext({ URL, FormData, Blob,
-    window: { WINE_API_BASE: base, location: { origin: 'http://localhost:8080' } },
+    window: { WINE_API_BASE: base, WINE_LOCAL_IMAGE_MAP: {}, location: { origin: 'http://localhost:8080' } },
     sessionStorage: storage(initial),
     fetch: async (...args) => {
       calls.push(args);

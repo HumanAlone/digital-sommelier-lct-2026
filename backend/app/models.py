@@ -2,6 +2,7 @@ import copy
 import json
 
 import faiss
+import numpy as np
 import torch
 import torch.nn.functional as F
 from config import CFG, PATHS
@@ -37,8 +38,9 @@ def embed_pair(proc, base, ft, img):
 
 
 def load_indexes():
-    idx_b = faiss.read_index(str(PATHS.recall_idx))
-    idx_f = faiss.read_index(str(PATHS.rerank_idx))
+    # Python handles Unicode Windows paths; FAISS's native file reader may not.
+    idx_b = faiss.deserialize_index(np.frombuffer(PATHS.recall_idx.read_bytes(), dtype=np.uint8))
+    idx_f = faiss.deserialize_index(np.frombuffer(PATHS.rerank_idx.read_bytes(), dtype=np.uint8))
     with open(PATHS.recall_slugs, encoding="utf-8") as f:
         slugs_b = json.load(f)
     with open(PATHS.rerank_slugs, encoding="utf-8") as f:
