@@ -8,7 +8,7 @@ const persist = (key, value) => localStorage.setItem(key, JSON.stringify(value))
 
 const state = {
   page: 'home', previousPage: 'home', wines: [], selectedId: null, loading: true, loadError: false,
-  photo: null, previewUrl: null, cameraStatus: 'idle', foundByPrediction: false, predictionCandidates: [],
+  photo: null, previewUrl: null, cameraStatus: 'idle', foundByPrediction: false,
   query: '', catalogLimit: 24, filtersOpen: false,
   filters: { category: '', region: '', winery: '', grape: '' },
   favorites: saved('wine:v3:favorites', saved('wine:v2:favorites', [])),
@@ -114,18 +114,6 @@ function recognizing() {
   return `${header()}<div class="recognition"><div class="recognition-mark">${icon('scan',38)}</div><span class="eyebrow">АНАЛИЗ ИЗОБРАЖЕНИЯ</span><h1>Ищем ваше вино</h1><p>Сверяем этикетку с каталогом российских вин</p><div class="progress-line"><i></i></div><ol><li class="done">Фото подготовлено</li><li class="active">Поиск совпадения</li><li>Открытие карточки</li></ol></div>`;
 }
 
-function isUncertainPrediction(response, candidateIds) {
-  const confidence = Number(response.confidence);
-  const gap = Number(response.gap);
-  return candidateIds.length > 1
-    && ((Number.isFinite(confidence) && confidence < 0.65) || (Number.isFinite(gap) && gap < 0.08));
-}
-
-function predictionOptions() {
-  const candidates = state.predictionCandidates;
-  return `${header({ back: true, title: 'Уточните вино' })}<div class="prediction-options"><span class="eyebrow">НУЖНА ВАША ПОМОЩЬ</span><h2>Нашли несколько похожих этикеток</h2><p>Выберите бутылку, которая больше всего похожа на вашу.</p><div class="catalog-list">${candidates.map(wineRow).join('')}</div><button class="text-button" data-page="scanner">Сделать другое фото</button></div>`;
-}
-
 function similarWines(wine) {
   return state.wines.filter((item) => item.id !== wine.id).map((item) => {
     let score = 0;
@@ -212,7 +200,7 @@ function diary() {
 }
 const settings = () => `${header({back:true,title:'Настройки'})}<div class="menu-list settings-list">${[['Данные профиля','Списки хранятся в этом браузере'],['Приватность','Фото не сохраняются интерфейсом'],['Тема приложения','Фирменная светлая'],['О проекте','Хакатон РСХБ.Цифра 2026']].map(([title,subtitle]) => `<div class="menu-row static"><span><strong>${title}</strong><small>${subtitle}</small></span></div>`).join('')}</div>`;
 
-const pages = { home,catalog,scanner,preview,recognizing,predictionOptions,result,notfound:notFound,sommelier,compare,taste,recommendations,profile,favorites,history,collections,collectionDetail,diary,settings };
+const pages = { home,catalog,scanner,preview,recognizing,result,notfound:notFound,sommelier,compare,taste,recommendations,profile,favorites,history,collections,collectionDetail,diary,settings };
 let cameraStream = null;
 let cameraRequestId = 0;
 
@@ -295,13 +283,12 @@ app.addEventListener('click', async (event) => {
     go('recognizing');
     try {
       const response = await predictWine(state.photo);
-      const ids = [...new Set([response.wine_id, response.slug, ...Array.from({ length: 10 }, (_, index) => response[`top${index + 1}_slug`])].filter(Boolean))];
-      const wines = await Promise.all(ids.map(async (id) => wineById(id) || await getWine(id)));
-      const candidates = wines.filter(Boolean);
-      candidates.forEach((wine) => { if (!wineById(wine.id)) state.wines.push(wine); });
-      if (!candidates.length) go('notfound');
-      else if (isUncertainPrediction(response, ids)) { state.predictionCandidates = candidates.slice(0, 4); go('predictionOptions'); }
-      else openWine(candidates[0].id, true);
+      const id = response.slug ?? response.wine_id;
+      if (!id) { go('notfound'); return; }
+      const wine = wineById(id) || await getWine(id);
+      if (!wine) { go('notfound'); return; }
+      if (!wineById(wine.id)) state.wines.push(wine);
+      openWine(wine.id, true);
     } catch { go('notfound'); }
   }
 

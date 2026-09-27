@@ -82,13 +82,13 @@ for(const response of [{slug:'red',confidence:.92,gap:.2},{wine_id:'white',confi
   const h=await appHarness({hasBackend:true,predictWine:async()=>response}); h.state.photo=new Blob(['image']);
   await h.click({action:'recognize'}); assert.equal(h.state.page,'result'); assert.equal(h.state.selectedId,response.slug||response.wine_id);
 });
-test('uncertain prediction shows only candidates returned by ML',async()=>{
+test('low scores still open the model chosen slug without loading alternatives',async()=>{
   const response={slug:'red',confidence:.54,gap:.03,top1_slug:'red',top2_slug:'red2',top3_slug:'white'};
   const h=await appHarness({hasBackend:true,predictWine:async()=>response}); h.state.photo=new Blob(['image']);
   await h.click({action:'recognize'});
-  assert.equal(h.state.page,'predictionOptions');
-  assert.deepEqual(JSON.parse(JSON.stringify(h.state.predictionCandidates.map(wine=>wine.id))),['red','red2','white']);
-  assert.match(h.app.innerHTML,/Нашли несколько похожих этикеток/);
+  assert.equal(h.state.page,'result');
+  assert.equal(h.state.selectedId,'red');
+  assert.doesNotMatch(h.app.innerHTML,/Нашли несколько похожих этикеток/);
 });
 for(const predictWine of [async()=>({slug:''}),async()=>{throw Error('offline');}]) test('failed scan displays recovery screen',async()=>{
   const h=await appHarness({hasBackend:true,predictWine}); h.state.photo=new Blob(['image']);
