@@ -58,7 +58,9 @@ jobs:
 
       - name: Start frontend image
         run: |
-          docker run --detach --rm --name digital-sommelier-frontend-ci --publish 8080:80 digital-sommelier-frontend:ci
+          # Nginx resolves the Compose service name at startup. The frontend
+          # healthcheck itself is static, so CI supplies an inert hostname.
+          docker run --detach --name digital-sommelier-frontend-ci --add-host backend:127.0.0.1 --publish 8080:80 digital-sommelier-frontend:ci
 
       - name: Wait for frontend healthcheck
         run: |
@@ -73,4 +75,4 @@ jobs:
 
       - name: Stop frontend image
         if: always()
-        run: docker stop digital-sommelier-frontend-ci || true
+        run: docker rm --force digital-sommelier-frontend-ci || true
