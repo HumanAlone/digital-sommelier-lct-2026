@@ -26,10 +26,10 @@ flowchart LR
 ```text
 backend/artifacts/models/best.pt
 backend/artifacts/models/siglip_full_best.pt
-backend/artifacts/indices/base.faiss
-backend/artifacts/indices/finetuned.faiss
-backend/artifacts/indices/base_slugs.json
-backend/artifacts/indices/finetuned_slugs.json
+backend/artifacts/index/gallery.faiss
+backend/artifacts/index/gallery_finetuned.faiss
+backend/artifacts/gallery_slugs.json
+backend/artifacts/gallery_slugs_finetuned.json
 ```
 
 В текущем рабочем проекте все перечисленные файлы присутствуют. Веса `.pt` хранятся через Git LFS, поэтому после нового клонирования выполните `git lfs pull`. Backend специально завершится с понятной ошибкой, если один из файлов отсутствует или вместо него остался LFS pointer. Большие ML-файлы не встраиваются в Docker image: они подключаются через bind mount при запуске.
@@ -82,18 +82,18 @@ Frontend и backend используют одинаковые пути:
 
 В Docker Nginx передаёт `/wines` и `/predict` в FastAPI, не меняя путь.
 
-Авторизация, личные подборки, избранное, история и дневник пока работают только как интерфейс и локальные данные браузера. Для серверного хранения backend должен позже реализовать соответствующие endpoints.
+Избранное, история, подборки и дневник хранятся в `localStorage` браузера. Регистрации и авторизации в текущем приложении нет. Если сокомандник добавит серверное хранение, новые маршруты лучше вводить отдельным контрактом, не меняя существующие `/wines`, `/wines/{id}` и `/predict`.
 
 ## CI/CD
 
 ### CI — `.github/workflows/ci.yml`
 
-На каждый pull request и push в `main` или `develop` выполняются:
+На каждый pull request и push в `main`, `develop` или `dev` выполняются:
 
 1. API и catalog contract tests;
 2. проверка синтаксиса Python и JavaScript;
-3. проверка `compose.yaml`;
-4. тестовая сборка frontend image.
+3. проверка `compose.yaml` и `compose.prod.yaml`;
+4. тестовая сборка frontend image и запуск его healthcheck.
 
 Полная сборка ML backend не выполняется в CI, чтобы обычная проверка не скачивала PyTorch и модели. Она выполняется в release workflow.
 
@@ -111,7 +111,8 @@ ghcr.io/<owner>/digital-sommelier-backend
 На подготовленном сервере опубликованные образы запускаются отдельным production-файлом:
 
 ```powershell
-$env:REGISTRY_IMAGE_PREFIX = "ghcr.io/<owner>/digital-sommelier"
+Copy-Item .env.example .env
+# При необходимости замените тег на версию, например v1.0.0.
 $env:IMAGE_TAG = "latest"
 docker compose -f compose.prod.yaml pull
 docker compose -f compose.prod.yaml up -d
@@ -123,7 +124,7 @@ docker compose -f compose.prod.yaml up -d
 
 - положить `siglip_full_best.pt` и индексы в защищённое хранилище артефактов;
 - настроить HTTPS и домен;
-- добавить постоянную БД и серверную авторизацию;
+- при необходимости добавить постоянную БД для пользовательских данных;
 - ограничить CORS и размер/тип загружаемых файлов;
 - добавить мониторинг CPU, RAM, времени распознавания и ошибок;
 - провести нагрузочное тестирование на целевой машине с доступной памятью для всех ML-моделей.
