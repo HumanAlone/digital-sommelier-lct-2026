@@ -7,6 +7,7 @@ const saved = (key, fallback) => {
 const persist = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 
 const state = {
+  theme: saved('wine:theme', 'light') === 'dark' ? 'dark' : 'light',
   page: 'home', previousPage: 'home', wines: [], selectedId: null, loading: true, loadError: false,
   photo: null, previewUrl: null, cameraStatus: 'idle', foundByPrediction: false,
   query: '', catalogLimit: 24, filtersOpen: false,
@@ -198,7 +199,14 @@ function collectionDetail() {
 function diary() {
   return `${header({back:true,title:'Винный дневник'})}<p class="page-lead">Сохраняйте впечатления от российских вин.</p>${state.diary.map((entry) => { const wine = wineById(entry.wineId); return wine ? `<article class="diary-card"><span>${'★'.repeat(entry.rating)}${'☆'.repeat(5-entry.rating)}</span><h2>${esc(wine.name)}</h2><p>${esc(entry.note || 'Без заметки')}</p></article>` : ''; }).join('') || empty('Здесь появятся ваши оценки и заметки.')}<button class="primary-button full diary-add" data-action="new-diary">${icon('plus',17)} Добавить запись</button>`;
 }
-const settings = () => `${header({back:true,title:'Настройки'})}<div class="menu-list settings-list">${[['Данные профиля','Списки хранятся в этом браузере'],['Приватность','Фото не сохраняются интерфейсом'],['Тема приложения','Фирменная светлая'],['О проекте','Хакатон РСХБ.Цифра 2026']].map(([title,subtitle]) => `<div class="menu-row static"><span><strong>${title}</strong><small>${subtitle}</small></span></div>`).join('')}</div>`;
+const settings = () => `${header({back:true,title:'Настройки'})}<div class="menu-list settings-list"><button class="menu-row theme-control" data-action="toggle-theme" role="switch" aria-checked="${state.theme === 'dark'}" aria-label="Тёмная тема"><span><strong>Тёмная тема</strong><small>${state.theme === 'dark' ? 'Включена · глубокие винные оттенки' : 'Выключена · фирменная светлая'}</small></span><span class="theme-switch" aria-hidden="true"></span></button>${[['Данные профиля','Списки хранятся в этом браузере'],['Приватность','Фото не сохраняются интерфейсом'],['О проекте','Хакатон РСХБ.Цифра 2026']].map(([title,subtitle]) => `<div class="menu-row static"><span><strong>${title}</strong><small>${subtitle}</small></span></div>`).join('')}</div>`;
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) themeColor.content = state.theme === 'dark' ? '#1c1519' : '#fffaf4';
+}
+applyTheme();
 
 const pages = { home,catalog,scanner,preview,recognizing,result,notfound:notFound,sommelier,compare,taste,recommendations,profile,favorites,history,collections,collectionDetail,diary,settings };
 let cameraStream = null;
@@ -268,6 +276,12 @@ app.addEventListener('click', async (event) => {
   if (target.dataset.filterRegion) { state.filters.region = target.dataset.filterRegion; state.filtersOpen = true; go('catalog'); return; }
   if (target.dataset.sommelier) { state.sommelier[target.dataset.sommelier] = target.dataset.value; state.sommelierResults = []; render(); return; }
   const {action,id} = target.dataset;
+  if (action === 'toggle-theme') {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    applyTheme();
+    try { persist('wine:theme', state.theme); } catch { /* Keep the theme usable when storage is unavailable. */ }
+    render();
+  }
   if (action === 'back') { go(({preview:'scanner',scanner:'home',predictionOptions:'preview',result:'catalog',collectionDetail:'collections'})[state.page] || state.previousPage || 'home'); }
   if (action === 'toggle-filters') { state.filtersOpen = !state.filtersOpen; render(); }
   if (action === 'reset-filters') { state.filters = {category:'',region:'',winery:'',grape:''}; state.query=''; state.catalogLimit=24; render(); }

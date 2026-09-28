@@ -2,6 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appHarness, wines, storage } from './helpers.mjs';
 
+test('dark theme toggles in settings, survives reload and switches back', async () => {
+  const localStorage = storage();
+  const h = await appHarness({ localStorage });
+  h.run("go('settings')");
+  assert.equal(h.context.document.documentElement.dataset.theme, 'light');
+  await h.click({ action: 'toggle-theme' });
+  assert.equal(h.context.document.documentElement.dataset.theme, 'dark');
+  assert.match(h.app.innerHTML, /role="switch" aria-checked="true"/);
+  const reloaded = await appHarness({ localStorage });
+  assert.equal(reloaded.context.document.documentElement.dataset.theme, 'dark');
+  await reloaded.click({ action: 'toggle-theme' });
+  assert.equal(reloaded.context.document.documentElement.dataset.theme, 'light');
+  assert.equal(JSON.parse(localStorage.getItem('wine:theme')), 'light');
+});
+
+test('theme remains usable when browser storage cannot be written', async () => {
+  const h = await appHarness({ localStorage: { getItem() { throw Error('unavailable'); }, setItem() { throw Error('unavailable'); } } });
+  await h.click({ action: 'toggle-theme' });
+  assert.equal(h.context.document.documentElement.dataset.theme, 'dark');
+});
+
 for (const query of ['каберне', ' КАБЕРНЕ ', 'Юг', 'Крым', 'Шардоне']) {
   test(`search by name, winery, region or grape: ${query}`, async () => {
     const h = await appHarness(); h.state.query = query;

@@ -17,7 +17,7 @@ export async function appHarness(overrides = {}) {
   const context = vm.createContext({
     console, URL, File, Blob,
     window: { scrollTo() {} }, navigator: {},
-    document: { querySelector: s => s === '#app' ? app : elements[s] ?? null, addEventListener() {} },
+    document: { documentElement: { dataset: {} }, querySelector: s => s === '#app' ? app : elements[s] ?? null, addEventListener() {} },
     localStorage: storage(), prompt: () => null,
     hasBackend: false, getWines: async () => structuredClone(wines),
     getWine: async () => null, predictWine: async () => ({ slug: '' }),
